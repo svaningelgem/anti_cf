@@ -1,5 +1,8 @@
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import patch
+import pytest_mock
+from requests import HTTPError
 
 from anti_cf import session
 from anti_cf._constants import FLARESOLVERR_PROXY
@@ -7,15 +10,18 @@ from anti_cf._persistent_session import PersistentSession
 
 
 class TestIntegration:
-    def test_package_exports_session(self):
+    def test_package_exports_session(self) -> None:
         """Test that the package properly exports session."""
         import anti_cf
 
         assert hasattr(anti_cf, "session")
         from anti_cf._persistent_session import PersistentSession
+
         assert isinstance(anti_cf.session, PersistentSession)
 
-    def test_complete_workflow(self, mocker, cloudflare_error, standard_response, cloudflare_response):
+    def test_complete_workflow(
+        self, mocker: pytest_mock.MockerFixture, cloudflare_error: HTTPError, standard_response: MagicMock, cloudflare_response: MagicMock
+    ) -> None:
         """Test the complete workflow of handling a cloudflare-protected site."""
         # Setup sequence of responses:
         # 1. First request fails with cloudflare protection
@@ -42,7 +48,7 @@ class TestIntegration:
         # Verify URL was passed to the proxy
         assert "example.com" in str(kwargs)
 
-    def test_session_reuses_cf_cookie(self, mocker, standard_response):
+    def test_session_reuses_cf_cookie(self, mocker: pytest_mock.MockerFixture, standard_response: MagicMock) -> None:
         """Test that the session reuses cloudflare cookies if they exist."""
         # Setup - add a cloudflare cookie
         session.cookies.set("cf_clearance", "test_value", domain="example.com")
@@ -61,7 +67,9 @@ class TestIntegration:
 
 
 @pytest.mark.parametrize("try_with_cloudflare", [True, False])
-def test_error_handling_based_on_flag(mocker, cloudflare_error, mock_logger, try_with_cloudflare):
+def test_error_handling_based_on_flag(
+    mocker: pytest_mock.MockerFixture, cloudflare_error: HTTPError, mock_logger: dict[str, MagicMock], try_with_cloudflare: bool
+) -> None:
     """Test error handling behavior with different try_with_cloudflare flags."""
     # Setup
     mocker.patch("requests.Session.get", side_effect=cloudflare_error)
@@ -71,7 +79,7 @@ def test_error_handling_based_on_flag(mocker, cloudflare_error, mock_logger, try
     try:
         ps = PersistentSession()
         ps.get("https://example.com", try_with_cloudflare=try_with_cloudflare)
-    except:
+    except:  # noqa: E722
         pass
 
     assert mock_flaresolverr.called

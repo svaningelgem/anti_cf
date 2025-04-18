@@ -2,25 +2,18 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from requests import Response
-
-import anti_cf._persistent_session
+import pytest_mock
+from requests import HTTPError, Response
 
 
 @pytest.fixture
-def mock_session_get(mocker):
+def mock_session_get(mocker: pytest_mock.MockerFixture) -> MagicMock:
     """Mock Session.get method."""
     return mocker.patch("requests.Session.get")
 
 
 @pytest.fixture
-def mock_session_post(mocker):
-    """Mock Session.post method."""
-    return mocker.patch("requests.Session.post")
-
-
-@pytest.fixture
-def mock_logger(mocker) -> dict[str, MagicMock]:
+def mock_logger(mocker: pytest_mock.MockerFixture) -> dict[str, MagicMock]:
     """Mock logger."""
     return {
         "info": mocker.patch("anti_cf._persistent_session.logger.info"),
@@ -31,15 +24,7 @@ def mock_logger(mocker) -> dict[str, MagicMock]:
 
 
 @pytest.fixture
-def mock_user_agent(mocker):
-    """Mock fake_useragent."""
-    mock_ua = MagicMock()
-    mock_ua.random = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0"
-    return mocker.patch("fake_useragent.UserAgent", return_value=mock_ua)
-
-
-@pytest.fixture
-def cloudflare_response():
+def cloudflare_response() -> MagicMock:
     """Create a mock response from flaresolverr."""
     resp = MagicMock(spec=Response)
     resp.json.return_value = {
@@ -58,7 +43,7 @@ def cloudflare_response():
 
 
 @pytest.fixture
-def standard_response():
+def standard_response() -> MagicMock:
     """Create a standard mock response."""
     resp = MagicMock(spec=Response)
     resp.status_code = 200
@@ -67,10 +52,8 @@ def standard_response():
 
 
 @pytest.fixture
-def cloudflare_error():
+def cloudflare_error() -> HTTPError:
     """Create a cloudflare error response."""
-    from requests import HTTPError
-
     error_response = MagicMock(spec=Response)
     error_response.content = b"just a moment"
     error = HTTPError("403 Client Error: Forbidden")
@@ -79,6 +62,6 @@ def cloudflare_error():
 
 
 @pytest.fixture(autouse=True)
-def reset_cookies(tmp_path: Path, monkeypatch) -> None:
-    """Reset cookies."""
-    anti_cf._persistent_session.PersistentSession._COOKIES_FILE = tmp_path / "anti_cf.cookies"
+def generic_files_should_not_exist(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+    mocker.patch("anti_cf._persistent_session.PersistentSession._COOKIES_FILE", tmp_path / "anti_cf.cookies")
+    mocker.patch("anti_cf._persistent_session.PersistentSession._USER_AGENT_FILE", tmp_path / "UA_AGENT.txt")

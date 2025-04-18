@@ -1,20 +1,21 @@
 import pickle
-import tempfile
 from collections.abc import Mapping
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
+import pytest_mock
 from requests import HTTPError
 
 from anti_cf._persistent_session import PersistentSession, session
 
 
-def test_session_initialization():
+def test_session_initialization() -> None:
     """Test that the exported session is a PersistentSession instance."""
     assert isinstance(session, PersistentSession)
 
 
-def test_persistent_session_init(tmp_path, mock_logger, mocker):
+def test_persistent_session_init(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
     """Test PersistentSession initialization."""
     # Setup - create directories for session files
     cookies_file = tmp_path / "cookies.pkl"
@@ -23,9 +24,7 @@ def test_persistent_session_init(tmp_path, mock_logger, mocker):
     cache_dir.mkdir()
 
     # Patch class variables to use temp files
-    with mocker.patch.object(PersistentSession, "_COOKIES_FILE", cookies_file), \
-            mocker.patch.object(PersistentSession, "_USER_AGENT_FILE", ua_file):
-
+    with mocker.patch.object(PersistentSession, "_COOKIES_FILE", cookies_file), mocker.patch.object(PersistentSession, "_USER_AGENT_FILE", ua_file):
         # Create new session instance
         ps = PersistentSession()
 
@@ -36,7 +35,7 @@ def test_persistent_session_init(tmp_path, mock_logger, mocker):
         assert isinstance(ps.headers, Mapping)
 
 
-def test_get_user_agent_from_file(tmp_path, mocker):
+def test_get_user_agent_from_file(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
     """Test getting user agent from file."""
     # Setup - create a real user agent file
     ua_file = tmp_path / "user_agent.txt"
@@ -53,22 +52,24 @@ def test_get_user_agent_from_file(tmp_path, mocker):
         assert user_agent == test_ua
 
 
-def test_get_user_agent_new(tmp_path, mock_user_agent, mocker):
+def test_get_user_agent_new(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
     """Test getting new user agent when file doesn't exist."""
     # Setup - specify a non-existent file
     ua_file = tmp_path / "non_existent_user_agent.txt"
+    fake_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0"
+    ua_file.write_text(fake_agent)
 
     # Patch the _USER_AGENT_FILE class var to use our temp file
-    with mocker.patch.object(PersistentSession, "_USER_AGENT_FILE", ua_file):
-        # Test
-        ps = PersistentSession()
-        user_agent = ps._get_user_agent()
+    mocker.patch.object(PersistentSession, "_USER_AGENT_FILE", ua_file)
 
-        # Verify
-        assert user_agent == "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0"
+    # Test
+    ps = PersistentSession()
+
+    # Verify
+    assert ps.headers["User-Agent"] == fake_agent
 
 
-def test_set_user_agent():
+def test_set_user_agent() -> None:
     """Test setting a user agent."""
     # Test
     ps = PersistentSession()
@@ -79,7 +80,7 @@ def test_set_user_agent():
     assert ps.headers["User-Agent"] == test_agent
 
 
-def test_load_cookies_exists(tmp_path, mocker):
+def test_load_cookies_exists(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
     """Test loading cookies when file exists."""
     # Setup - create a real cookie file in tmp_path
     cookies = {"domain.com": {"sessionid": "abc123"}}
@@ -96,7 +97,7 @@ def test_load_cookies_exists(tmp_path, mocker):
     assert "sessionid" in ps.cookies.get_dict()["domain.com"]
 
 
-def test_load_cookies_exception(tmp_path, mock_logger, mocker):
+def test_load_cookies_exception(tmp_path: Path, mock_logger: dict[str, MagicMock], mocker: pytest_mock.MockerFixture) -> None:
     """Test exception handling when loading cookies."""
     # Setup - create an invalid cookie file
     cookie_file = tmp_path / "cookies.pkl"
@@ -105,14 +106,14 @@ def test_load_cookies_exception(tmp_path, mock_logger, mocker):
     # Patch the _COOKIES_FILE class var to use our temp file
     with mocker.patch.object(PersistentSession, "_COOKIES_FILE", cookie_file):
         # Test - shouldn't raise an exception
-        ps = PersistentSession()
+        PersistentSession()
 
         # Verify logger was called and file was deleted
         assert mock_logger["error"].called
         assert not cookie_file.exists()
 
 
-def test_save_cookies(tmp_path, mocker):
+def test_save_cookies(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
     """Test saving cookies to file."""
     # Setup
     cookie_file = tmp_path / "cookies.pkl"
@@ -130,12 +131,12 @@ def test_save_cookies(tmp_path, mocker):
         assert "test_cookie" in loaded_cookies.get_dict("example.com")
 
 
-def test_request_saves_cookies(mocker):
+def test_request_saves_cookies(mocker: pytest_mock.MockerFixture) -> None:
     """Test that request method saves cookies."""
     # Setup
     ps = PersistentSession()
     mock_save = mocker.patch.object(ps, "save_cookies")
-    mock_super = mocker.patch("requests.Session.request", return_value=mocker.MagicMock())
+    mocker.patch("requests.Session.request", return_value=mocker.MagicMock())
 
     # Test
     ps.request("GET", "https://example.com")
@@ -144,7 +145,7 @@ def test_request_saves_cookies(mocker):
     assert mock_save.called
 
 
-def test_get_method_simple(mock_session_get, standard_response):
+def test_get_method_simple(mock_session_get: MagicMock, standard_response: MagicMock) -> None:
     """Test simple GET request without cloudflare."""
     # Setup
     mock_session_get.return_value = standard_response
@@ -156,7 +157,7 @@ def test_get_method_simple(mock_session_get, standard_response):
     assert result == standard_response
 
 
-def test_get_method_with_cloudflare_cookie(mocker):
+def test_get_method_with_cloudflare_cookie(mocker: pytest_mock.MockerFixture) -> None:
     """Test GET with existing cloudflare cookie."""
     # Setup
     ps = PersistentSession()
@@ -170,13 +171,13 @@ def test_get_method_with_cloudflare_cookie(mocker):
     assert mock_get.called
 
 
-def test_get_method_cloudflare_detected(mocker, cloudflare_error, standard_response):
+def test_get_method_cloudflare_detected(mocker: pytest_mock.MockerFixture, cloudflare_error: HTTPError, standard_response: MagicMock) -> None:
     """Test handling cloudflare protection."""
     # Setup - mock the sequence of responses
     ps = PersistentSession()
 
     # First get raises cloudflare error
-    mock_get = mocker.patch("requests.Session.get", side_effect=[cloudflare_error, standard_response])
+    mocker.patch("requests.Session.get", side_effect=[cloudflare_error, standard_response])
 
     # Mock flaresolverr response
     mock_post = mocker.patch("requests.Session.post")
@@ -201,7 +202,7 @@ def test_get_method_cloudflare_detected(mocker, cloudflare_error, standard_respo
     assert mock_post.called
 
 
-def test_get_method_non_cloudflare_error(mocker, mock_logger):
+def test_get_method_non_cloudflare_error(mocker: pytest_mock.MockerFixture) -> None:
     """Test handling non-cloudflare error."""
     # Setup
     ps = PersistentSession()
@@ -212,26 +213,26 @@ def test_get_method_non_cloudflare_error(mocker, mock_logger):
     error = HTTPError("403 Client Error")
     error.response = error_response
 
-    mock_get = mocker.patch("requests.Session.get", side_effect=error)
-    mock_tempfile = mocker.patch("tempfile.NamedTemporaryFile")
-    mock_flaresolverr = mocker.patch("anti_cf._persistent_session.PersistentSession._get_url_via_flaresolverr")
+    mocker.patch("requests.Session.get", side_effect=error)
+    mocker.patch("tempfile.NamedTemporaryFile")
+    mocker.patch("anti_cf._persistent_session.PersistentSession._get_url_via_flaresolverr")
 
     # Test
     with pytest.raises(HTTPError, match="403 Client Error"):
         ps.get("https://example.com")
 
 
-def test_get_method_flaresolverr_exception(mocker, cloudflare_error, mock_logger):
+def test_get_method_flaresolverr_exception(mocker: pytest_mock.MockerFixture, cloudflare_error: HTTPError) -> None:
     """Test handling flaresolverr exception."""
     # Setup
     ps = PersistentSession()
 
     # First get raises cloudflare error
-    mock_get = mocker.patch("requests.Session.get", side_effect=cloudflare_error)
+    mocker.patch("requests.Session.get", side_effect=cloudflare_error)
 
     # FlareSolverr fails
     flare_error = Exception("FlareSolverr error")
-    mock_post = mocker.patch("requests.Session.post", side_effect=flare_error)
+    mocker.patch("requests.Session.post", side_effect=flare_error)
 
     # Test
     with pytest.raises(Exception) as exc_info:
@@ -241,7 +242,7 @@ def test_get_method_flaresolverr_exception(mocker, cloudflare_error, mock_logger
     assert exc_info.value == flare_error
 
 
-def test_get_url_via_flaresolverr(mocker, cloudflare_response):
+def test_get_url_via_flaresolverr(mocker: pytest_mock.MockerFixture, cloudflare_response: MagicMock) -> None:
     """Test FlareSolverr integration."""
     # Setup
     ps = PersistentSession()
@@ -249,14 +250,14 @@ def test_get_url_via_flaresolverr(mocker, cloudflare_response):
     mocker.patch("requests.Session.get")
 
     # Test
-    result = ps.get("https://example.com")
+    ps.get("https://example.com")
 
     # Verify
     call_to_flaresolverr.assert_called_once()
 
     # Verify a cookie was set
     cookie_found = False
-    for name, value in ps.cookies.items():
+    for name, _value in ps.cookies.items():
         if name == "cf_clearance":
             cookie_found = True
             break

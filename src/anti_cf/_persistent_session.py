@@ -3,12 +3,11 @@ from __future__ import annotations
 import pickle
 import tempfile
 from typing import TYPE_CHECKING, ClassVar
-from ._constants import CACHE_PATH
-from ._constants import FLARESOLVERR_PROXY, DEFAULT_TIMEOUT
 
 import fake_useragent
 from logprise import logger
 
+from ._constants import CACHE_PATH, DEFAULT_TIMEOUT, FLARESOLVERR_PROXY
 
 try:
     from requests_cache import CachedSession as Session
@@ -16,7 +15,7 @@ try:
     _HAS_CACHE = True
     logger.info("Using CachedSession for persistent session")
 except ImportError:
-    from requests import Session, HTTPError
+    from requests import HTTPError, Session
 
     _HAS_CACHE = False
 
@@ -24,7 +23,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from requests import Response
-
 
 
 class PersistentSession(Session):
@@ -55,7 +53,7 @@ class PersistentSession(Session):
 
         return fake_useragent.UserAgent(os="windows", platforms="pc", browsers="chrome").random
 
-    def set_user_agent(self, user_agent: str = None) -> None:
+    def set_user_agent(self, user_agent: str | None = None) -> None:
         if user_agent is None:
             user_agent = self._get_user_agent()
 
@@ -107,7 +105,7 @@ class PersistentSession(Session):
             # After the url is retrieved from the flaresolverr proxy, it's not necessarily the one we want
             #  --> So we'll re-request it here:
             return super().get(url, **kwargs)
-        except Exception as e:
+        except Exception:
             logger.error("FlareSolverr didn't solve it :(")
             raise
 
