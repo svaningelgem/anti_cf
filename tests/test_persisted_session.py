@@ -24,15 +24,17 @@ def test_persistent_session_init(tmp_path: Path, mocker: pytest_mock.MockerFixtu
     cache_dir.mkdir()
 
     # Patch class variables to use temp files
-    with mocker.patch.object(PersistentSession, "_COOKIES_FILE", cookies_file), mocker.patch.object(PersistentSession, "_USER_AGENT_FILE", ua_file):
-        # Create new session instance
-        ps = PersistentSession()
+    mocker.patch.object(PersistentSession, "_COOKIES_FILE", cookies_file)
+    mocker.patch.object(PersistentSession, "_USER_AGENT_FILE", ua_file)
 
-        # Verify user agent is set
-        assert "User-Agent" in ps.headers
+    # Create new session instance
+    ps = PersistentSession()
 
-        # Verify behavior, not implementation details
-        assert isinstance(ps.headers, Mapping)
+    # Verify user agent is set
+    assert "User-Agent" in ps.headers
+
+    # Verify behavior, not implementation details
+    assert isinstance(ps.headers, Mapping)
 
 
 def test_get_user_agent_from_file(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
@@ -43,13 +45,14 @@ def test_get_user_agent_from_file(tmp_path: Path, mocker: pytest_mock.MockerFixt
     ua_file.write_text(test_ua)
 
     # Patch the _USER_AGENT_FILE class var to use our temp file
-    with mocker.patch.object(PersistentSession, "_USER_AGENT_FILE", ua_file):
-        # Test
-        ps = PersistentSession()
-        user_agent = ps._get_user_agent()
+    mocker.patch.object(PersistentSession, "_USER_AGENT_FILE", ua_file)
 
-        # Verify
-        assert user_agent == test_ua
+    # Test
+    ps = PersistentSession()
+    user_agent = ps._get_user_agent()
+
+    # Verify
+    assert user_agent == test_ua
 
 
 def test_get_user_agent_new(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
@@ -104,13 +107,14 @@ def test_load_cookies_exception(tmp_path: Path, mock_logger: dict[str, MagicMock
     cookie_file.write_text("This is not a valid pickle file")
 
     # Patch the _COOKIES_FILE class var to use our temp file
-    with mocker.patch.object(PersistentSession, "_COOKIES_FILE", cookie_file):
-        # Test - shouldn't raise an exception
-        PersistentSession()
+    mocker.patch.object(PersistentSession, "_COOKIES_FILE", cookie_file)
 
-        # Verify logger was called and file was deleted
-        assert mock_logger["error"].called
-        assert not cookie_file.exists()
+    # Test - shouldn't raise an exception
+    PersistentSession()
+
+    # Verify logger was called and file was deleted
+    assert mock_logger["error"].called
+    assert not cookie_file.exists()
 
 
 def test_save_cookies(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
@@ -119,16 +123,17 @@ def test_save_cookies(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None
     cookie_file = tmp_path / "cookies.pkl"
 
     # Patch the _COOKIES_FILE class var to use our temp file
-    with mocker.patch.object(PersistentSession, "_COOKIES_FILE", cookie_file):
-        # Test
-        ps = PersistentSession()
-        ps.cookies.set("test_cookie", "test_value", domain="example.com")
-        ps.save_cookies()
+    mocker.patch.object(PersistentSession, "_COOKIES_FILE", cookie_file)
 
-        # Verify file was created and contains cookies
-        assert cookie_file.exists()
-        loaded_cookies = pickle.loads(cookie_file.read_bytes())
-        assert "test_cookie" in loaded_cookies.get_dict("example.com")
+    # Test
+    ps = PersistentSession()
+    ps.cookies.set("test_cookie", "test_value", domain="example.com")
+    ps.save_cookies()
+
+    # Verify file was created and contains cookies
+    assert cookie_file.exists()
+    loaded_cookies = pickle.loads(cookie_file.read_bytes())
+    assert "test_cookie" in loaded_cookies.get_dict("example.com")
 
 
 def test_request_saves_cookies(mocker: pytest_mock.MockerFixture) -> None:
