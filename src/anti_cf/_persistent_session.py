@@ -8,6 +8,7 @@ import fake_useragent
 from logprise import logger
 
 from ._constants import CACHE_PATH, DEFAULT_TIMEOUT, FLARESOLVERR_PROXY
+from ._flaresolverr import ensure_flaresolverr_running
 
 try:
     from requests_cache import CachedSession as Session
@@ -46,6 +47,7 @@ class PersistentSession(Session):
 
         self.set_user_agent()
         self._load_cookies()
+        ensure_flaresolverr_running()
 
     def _get_user_agent(self) -> str:
         if self._USER_AGENT_FILE.exists():
