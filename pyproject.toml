@@ -8,28 +8,14 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-#SQLAlchemy = "^2.0.36"
-#mysql-connector-python = "^9.1.0"
-#feedparser = "^6.0.11"
 logprise = "*"
-#bs4 = "^0.0.2"
-#0html = "^0.0.0"
-#dateparser = "^1.2.0"
-fake-useragent = "^1.5.1"
-#lxml = "^5.3.0"
-#requests-cache = "^1.2.1"
-#feedgenerator = "^2.1.0"
-#curl-cffi = "^0.7.3"
-#playwright = "^1.48"
-#flask = "^3.1.0"
-#pydantic = "^2.10.2"
+fake-useragent = "*"
 requests = "*"
 
 [tool.poetry.group.dev.dependencies]
-pytest-cov = "^6.0.0"
-pytest-mock = "^3.14.0"
+pytest-cov = "*"
+pytest-mock = "*"
 ruff = "*"
-#xmldiff = "^2.7.0"
 
 [build-system]
 requires = ["poetry-core"]
