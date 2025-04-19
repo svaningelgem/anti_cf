@@ -62,6 +62,8 @@ def cloudflare_error() -> HTTPError:
 
 
 @pytest.fixture(autouse=True)
-def generic_files_should_not_exist(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+def generic_setup(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
     mocker.patch("anti_cf._persistent_session.PersistentSession._COOKIES_FILE", tmp_path / "anti_cf.cookies")
     mocker.patch("anti_cf._persistent_session.PersistentSession._USER_AGENT_FILE", tmp_path / "UA_AGENT.txt")
+
+    mocker.patch("anti_cf._flaresolverr.check_flaresolverr_api", return_value=True)

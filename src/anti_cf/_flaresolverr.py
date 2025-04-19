@@ -29,8 +29,10 @@ def start_flaresolverr_docker() -> subprocess.Popen | None:
         )
 
         # Wait for container to be ready
-        for _ in range(10):  # Try for 10 seconds
-            time.sleep(1)
+        for loop in range(10):  # Try for 10 seconds
+            if loop > 0:
+                time.sleep(1)
+
             if check_flaresolverr_api():
                 logger.info("FlareSolverr is ready")
                 return process

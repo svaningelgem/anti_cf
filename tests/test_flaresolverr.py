@@ -21,7 +21,8 @@ def test_check_flaresolverr_api_failure(mocker: pytest_mock.MockerFixture) -> No
 def test_start_flaresolverr_docker_success(mocker: pytest_mock.MockerFixture) -> None:
     mock_process = mocker.Mock()
     mocker.patch("subprocess.Popen", return_value=mock_process)
-    mocker.patch("anti_cf._flaresolverr.check_flaresolverr_api", return_value=True)
+    mocker.patch("time.sleep")
+    mocker.patch("anti_cf._flaresolverr.check_flaresolverr_api", side_effect=[False, True])
 
     result = start_flaresolverr_docker()
 
