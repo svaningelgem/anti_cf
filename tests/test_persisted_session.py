@@ -150,13 +150,15 @@ def test_request_saves_cookies(mocker: pytest_mock.MockerFixture) -> None:
     assert mock_save.called
 
 
-def test_get_method_simple(mock_session_get: MagicMock, standard_response: MagicMock) -> None:
+def test_get_method_simple(mock_session_get: MagicMock, standard_response: MagicMock, mocker: pytest_mock.MockerFixture) -> None:
     """Test simple GET request without cloudflare."""
     # Setup
     mock_session_get.return_value = standard_response
+    mocker.patch("requests.Session.post")
 
     # Test
-    result = session.get("https://example.com")
+    ps = PersistentSession()
+    result = ps.get("https://example.com")
 
     # Verify
     assert result == standard_response
