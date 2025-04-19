@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "anti-cf"
+name = "anti_cf"
 version = "1.0.0"
 description = "Anti-CloudFlare package"
 authors = ["Steven Van Ingelgem <steven@vaningelgem.be>"]
@@ -32,7 +32,6 @@ python_files = ['*_tests.py', '*_test.py']
 pythonpath = [
     "."
 ]
-requests_mock_case_sensitive = true
 
 [tool.ruff]
 line-length = 160
