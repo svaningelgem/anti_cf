@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import fake_useragent
 from logprise import logger
+from requests import HTTPError
 
 from ._constants import CACHE_PATH, DEFAULT_TIMEOUT, FLARESOLVERR_PROXY
 from ._flaresolverr import ensure_flaresolverr_running, get_flaresolverr_settings
@@ -16,7 +17,7 @@ try:
     _HAS_CACHE = True
     logger.info("Using CachedSession for persistent session")
 except ImportError:
-    from requests import HTTPError, Session
+    from requests import Session
 
     _HAS_CACHE = False
 
