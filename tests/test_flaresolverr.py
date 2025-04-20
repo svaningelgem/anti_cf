@@ -40,13 +40,13 @@ def test_start_flaresolverr_docker_failure(mocker: pytest_mock.MockerFixture, mo
     result = start_flaresolverr_docker()
 
     assert result == mock_process
-    mock_logger["info"].assert_called_with('Starting FlareSolverr docker container...'            )
-    mock_logger["error"].assert_called_with('FlareSolverr container started but API not responding')
+    mock_logger["info"].assert_called_with("Starting FlareSolverr docker container...")
+    mock_logger["error"].assert_called_with("FlareSolverr container started but API not responding")
     mock_logger["warning"].assert_not_called()
     mock_logger["exception"].assert_not_called()
 
 
-def test_start_flaresolverr_docker_failure2(mocker: pytest_mock.MockerFixture, mock_logger: dict[str, MagicMock]) -> None:
+def test_start_flaresolverr_docker_failure2(mocker: pytest_mock.MockerFixture) -> None:
     mocker.patch("subprocess.Popen", side_effect=Exception("Docker error"))
 
     result = start_flaresolverr_docker()

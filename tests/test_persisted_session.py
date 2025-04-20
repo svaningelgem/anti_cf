@@ -4,7 +4,6 @@ from unittest.mock import MagicMock
 
 import pytest
 import pytest_mock
-from more_itertools.more import side_effect
 from requests import HTTPError
 
 from anti_cf._persistent_session import PersistentSession, session
@@ -168,7 +167,7 @@ def test_get_method_with_expired_cloudflare_cookie(mocker: pytest_mock.MockerFix
 
     # Test
     ps.get("https://example.com", try_with_cloudflare=True)
-    mock_logger["warning"].assert_called_with('Cloudflare cookie expired')
+    mock_logger["warning"].assert_called_with("Cloudflare cookie expired")
 
 
 def test_get_method_cloudflare_detected(mocker: pytest_mock.MockerFixture, cloudflare_error: HTTPError, standard_response: MagicMock) -> None:
