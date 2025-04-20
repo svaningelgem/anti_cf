@@ -7,19 +7,13 @@ from requests import HTTPError, Response
 
 
 @pytest.fixture
-def mock_session_get(mocker: pytest_mock.MockerFixture) -> MagicMock:
-    """Mock Session.get method."""
-    return mocker.patch("requests.Session.get")
-
-
-@pytest.fixture
 def mock_logger(mocker: pytest_mock.MockerFixture) -> dict[str, MagicMock]:
     """Mock logger."""
     return {
-        "info": mocker.patch("anti_cf._persistent_session.logger.info"),
-        "error": mocker.patch("anti_cf._persistent_session.logger.error"),
-        "warning": mocker.patch("anti_cf._persistent_session.logger.warning"),
-        "exception": mocker.patch("anti_cf._persistent_session.logger.exception"),
+        "info": mocker.patch("logprise.logger.info"),
+        "error": mocker.patch("logprise.logger.error"),
+        "warning": mocker.patch("logprise.logger.warning"),
+        "exception": mocker.patch("logprise.logger.exception"),
     }
 
 
@@ -63,7 +57,10 @@ def cloudflare_error() -> HTTPError:
 
 @pytest.fixture(autouse=True)
 def generic_setup(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+    mocker.patch("requests.Session.get")
+    mocker.patch("subprocess.Popen")  # Don't start docker!
+
     mocker.patch("anti_cf._persistent_session.PersistentSession._COOKIES_FILE", tmp_path / "anti_cf.cookies")
     mocker.patch("anti_cf._persistent_session.PersistentSession._USER_AGENT_FILE", tmp_path / "UA_AGENT.txt")
 
-    mocker.patch("anti_cf._flaresolverr.check_flaresolverr_api", return_value=True)
+    mocker.patch("anti_cf._flaresolverr.get_flaresolverr_settings", return_value={})

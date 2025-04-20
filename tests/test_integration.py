@@ -29,8 +29,7 @@ class TestIntegration:
         # 3. Second request succeeds with cookies
 
         # Mock Session.get to return our sequence
-        mock_get = mocker.patch("requests.Session.get")
-        mock_get.side_effect = [cloudflare_error, standard_response]
+        mocker.patch("requests.Session.get", side_effect=[standard_response, cloudflare_error])
 
         # Mock Session.post for FlareSolverr
         mock_post = mocker.patch("requests.Session.post", return_value=cloudflare_response)
@@ -86,6 +85,6 @@ def test_error_handling_based_on_flag(
 
     # Verify behavior based on flag
     if try_with_cloudflare:
-        assert mock_logger["warning"].call_args[0][0] == "Cloudflare cookie expired"
-    else:
         assert "FlareSolverr didn't solve it" in mock_logger["error"].call_args[0][0]
+    else:
+        assert mock_logger["warning"].call_args[0][0] == "Cloudflare detected, but `try_with_cloudflare` wasn't set to True!"

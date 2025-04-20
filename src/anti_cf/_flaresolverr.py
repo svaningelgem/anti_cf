@@ -9,13 +9,14 @@ from logprise import logger
 from ._constants import FLARESOLVERR_PROXY
 
 
-def check_flaresolverr_api() -> bool:
+def get_flaresolverr_settings() -> dict | None:
     """Check if FlareSolverr API is reachable."""
     try:
-        resp = requests.get(FLARESOLVERR_PROXY + "v1", timeout=2)
-        return resp.status_code == 200
+        resp = requests.get(FLARESOLVERR_PROXY, timeout=0.1)
+        resp.raise_for_status()
+        return resp.json()
     except:  # noqa: E722
-        return False
+        return None
 
 
 def start_flaresolverr_docker() -> subprocess.Popen | None:
@@ -33,7 +34,7 @@ def start_flaresolverr_docker() -> subprocess.Popen | None:
             if loop > 0:
                 time.sleep(1)
 
-            if check_flaresolverr_api():
+            if get_flaresolverr_settings() is not None:
                 logger.info("FlareSolverr is ready")
                 return process
 
@@ -46,7 +47,7 @@ def start_flaresolverr_docker() -> subprocess.Popen | None:
 
 def ensure_flaresolverr_running() -> subprocess.Popen | None:
     """Ensure FlareSolverr is running, start if needed."""
-    if check_flaresolverr_api():
+    if get_flaresolverr_settings() is not None:
         logger.info("FlareSolverr API is already running")
         return None
 
