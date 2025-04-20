@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest_mock
 
 from anti_cf._flaresolverr import ensure_flaresolverr_running, get_flaresolverr_settings, start_flaresolverr_docker
@@ -29,7 +31,22 @@ def test_start_flaresolverr_docker_success(mocker: pytest_mock.MockerFixture) ->
     assert result == mock_process
 
 
-def test_start_flaresolverr_docker_failure(mocker: pytest_mock.MockerFixture) -> None:
+def test_start_flaresolverr_docker_failure(mocker: pytest_mock.MockerFixture, mock_logger: dict[str, MagicMock]) -> None:
+    mock_process = mocker.Mock()
+    mocker.patch("subprocess.Popen", return_value=mock_process)
+    mocker.patch("time.sleep")
+    mocker.patch("anti_cf._flaresolverr.get_flaresolverr_settings", return_value=None)
+
+    result = start_flaresolverr_docker()
+
+    assert result == mock_process
+    mock_logger["info"].assert_called_with('Starting FlareSolverr docker container...'            )
+    mock_logger["error"].assert_called_with('FlareSolverr container started but API not responding')
+    mock_logger["warning"].assert_not_called()
+    mock_logger["exception"].assert_not_called()
+
+
+def test_start_flaresolverr_docker_failure2(mocker: pytest_mock.MockerFixture, mock_logger: dict[str, MagicMock]) -> None:
     mocker.patch("subprocess.Popen", side_effect=Exception("Docker error"))
 
     result = start_flaresolverr_docker()
