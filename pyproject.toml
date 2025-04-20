@@ -14,6 +14,7 @@ requests = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest-cov = "*"
+coverage = ">=7.2.0"
 pytest-mock = "*"
 ruff = "*"
 
@@ -126,6 +127,7 @@ branch = true
 [tool.coverage.report]
 exclude_also = [
     "if TYPE_CHECKING:",
+    "if _HAS_CACHE:",
     # Don't complain if non-runnable code isn't run:
     "if __name__ == .__main__.:",
 
