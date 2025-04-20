@@ -119,3 +119,11 @@ strict = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D100", "D103", "B018", "FBT001"]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+]
