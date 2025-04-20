@@ -7,12 +7,6 @@ from requests import HTTPError, Response
 
 
 @pytest.fixture
-def mock_session_get(mocker: pytest_mock.MockerFixture) -> MagicMock:
-    """Mock Session.get method."""
-    return mocker.patch("requests.Session.get")
-
-
-@pytest.fixture
 def mock_logger(mocker: pytest_mock.MockerFixture) -> dict[str, MagicMock]:
     """Mock logger."""
     return {
@@ -63,6 +57,8 @@ def cloudflare_error() -> HTTPError:
 
 @pytest.fixture(autouse=True)
 def generic_setup(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+    mocker.patch("requests.Session.get")
+
     mocker.patch("anti_cf._persistent_session.PersistentSession._COOKIES_FILE", tmp_path / "anti_cf.cookies")
     mocker.patch("anti_cf._persistent_session.PersistentSession._USER_AGENT_FILE", tmp_path / "UA_AGENT.txt")
 

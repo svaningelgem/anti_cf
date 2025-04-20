@@ -129,10 +129,10 @@ def test_request_saves_cookies(mocker: pytest_mock.MockerFixture) -> None:
     assert mock_save.called
 
 
-def test_get_method_simple(mock_session_get: MagicMock, standard_response: MagicMock, mocker: pytest_mock.MockerFixture) -> None:
+def test_get_method_simple(standard_response: MagicMock, mocker: pytest_mock.MockerFixture) -> None:
     """Test simple GET request without cloudflare."""
     # Setup
-    mock_session_get.return_value = standard_response
+    mocker.patch("requests.Session.get", return_value=standard_response)
     mocker.patch("requests.Session.post")
 
     # Test
@@ -163,7 +163,7 @@ def test_get_method_cloudflare_detected(mocker: pytest_mock.MockerFixture, cloud
     ps = PersistentSession()
 
     # First get raises cloudflare error
-    mocker.patch("requests.Session.get", side_effect=[cloudflare_error, standard_response])
+    mocker.patch("requests.Session.get", side_effect=[standard_response, cloudflare_error])
 
     # Mock flaresolverr response
     mock_post = mocker.patch("requests.Session.post")
@@ -188,7 +188,7 @@ def test_get_method_cloudflare_detected(mocker: pytest_mock.MockerFixture, cloud
     assert mock_post.called
 
 
-def test_get_method_non_cloudflare_error(mocker: pytest_mock.MockerFixture) -> None:
+def test_get_method_non_cloudflare_error(mocker: pytest_mock.MockerFixture, mock_logger: dict[str, MagicMock]) -> None:
     """Test handling non-cloudflare error."""
     # Setup
     ps = PersistentSession()
@@ -204,8 +204,11 @@ def test_get_method_non_cloudflare_error(mocker: pytest_mock.MockerFixture) -> N
     mocker.patch("anti_cf._persistent_session.PersistentSession._get_url_via_flaresolverr")
 
     # Test
-    with pytest.raises(HTTPError, match="403 Client Error"):
-        ps.get("https://example.com")
+    assert ps.get("https://example.com") is None
+    mock_logger["info"].assert_not_called()
+    mock_logger["warning"].assert_not_called()
+    mock_logger["error"].assert_any_call("No cloudflare trigger in response?")
+    mock_logger["exception"].assert_any_call(error)
 
 
 def test_get_method_flaresolverr_exception(mocker: pytest_mock.MockerFixture, cloudflare_error: HTTPError) -> None:
@@ -228,24 +231,15 @@ def test_get_method_flaresolverr_exception(mocker: pytest_mock.MockerFixture, cl
     assert exc_info.value == flare_error
 
 
-def test_get_url_via_flaresolverr(mocker: pytest_mock.MockerFixture, cloudflare_response: MagicMock) -> None:
-    """Test FlareSolverr integration."""
+def test_get_url_direct(mocker: pytest_mock.MockerFixture, cloudflare_response: MagicMock) -> None:
     # Setup
     ps = PersistentSession()
     call_to_flaresolverr = mocker.patch.object(ps, "post", return_value=cloudflare_response)
-    mocker.patch("requests.Session.get")
 
     # Test
     ps.get("https://example.com")
 
     # Verify
-    call_to_flaresolverr.assert_called_once()
+    call_to_flaresolverr.assert_not_called()
 
-    # Verify a cookie was set
-    cookie_found = False
-    for name, _value in ps.cookies.items():
-        if name == "cf_clearance":
-            cookie_found = True
-            break
-
-    assert cookie_found
+    assert  "cf_clearance" not in ps.cookies

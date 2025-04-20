@@ -87,7 +87,7 @@ class PersistentSession(Session):
         return response
 
     def get(self, url: str | bytes, *, try_with_cloudflare: bool = False, _cloudflare_counter: int = 0, **kwargs: object) -> Response | None:
-        if try_with_cloudflare or "cf_clearance" in self.cookies:
+        if not try_with_cloudflare or "cf_clearance" in self.cookies:
             try:
                 resp = super().get(url, **kwargs)
                 resp.raise_for_status()
