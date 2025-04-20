@@ -242,4 +242,4 @@ def test_get_url_direct(mocker: pytest_mock.MockerFixture, cloudflare_response: 
     # Verify
     call_to_flaresolverr.assert_not_called()
 
-    assert  "cf_clearance" not in ps.cookies
+    assert "cf_clearance" not in ps.cookies
