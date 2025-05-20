@@ -46,11 +46,21 @@ class PersistentSession(Session):
         else:
             super().__init__()
 
+        self._already_loaded = False
+
+    def _lazy_load(self) -> None:
+        if self._already_loaded:
+            return
+
         self._load_cookies()
         ensure_flaresolverr_running()
         self.set_user_agent()
 
+        self._already_loaded = True
+
     def _get_user_agent(self) -> str:
+        self._lazy_load()
+
         flaresolverr_settings = get_flaresolverr_settings()
         if flaresolverr_settings is not None:
             return flaresolverr_settings["userAgent"]
@@ -117,6 +127,8 @@ class PersistentSession(Session):
             raise
 
     def _get_url_via_flaresolverr(self, url: str) -> dict:
+        self._lazy_load()
+
         headers = {"Content-Type": "application/json"}
         data = {
             "cmd": "request.get",
