@@ -256,3 +256,24 @@ def test_get_url_direct(mocker: pytest_mock.MockerFixture, cloudflare_response: 
     call_to_flaresolverr.assert_not_called()
 
     assert "cf_clearance" not in ps.cookies
+
+
+def test_lazy_flaresolverr_branches(mocker: pytest_mock.MockerFixture) -> None:
+    """Test both FlareSolverr branches: settings check and initialization flag."""
+    mock_ensure = mocker.patch("anti_cf._persistent_session.ensure_flaresolverr_running")
+
+    # Branch 1: FlareSolverr running during init (settings not None)
+    mocker.patch("anti_cf._persistent_session.get_flaresolverr_settings", return_value={"userAgent": "FlareSolverr/1.0"})
+    ps = PersistentSession()
+    assert ps.headers["User-Agent"] == "FlareSolverr/1.0"
+
+    # Branch 2: Initialization flag check (not initialized -> initialize)
+    ps._flaresolverr_initialized = False
+    ps._ensure_flaresolverr_initialized()
+    assert mock_ensure.called
+    assert ps._flaresolverr_initialized
+
+    # Branch 3: initialized
+    mock_ensure.reset_mock()
+    ps._ensure_flaresolverr_initialized()
+    assert not mock_ensure.called
