@@ -47,10 +47,11 @@ class PersistentSession(Session):
             super().__init__()
 
         self._load_cookies()
-        ensure_flaresolverr_running()
         self.set_user_agent()
+        self._flaresolverr_initialized = False
 
     def _get_user_agent(self) -> str:
+        # Try FlareSolverr first, but don't start it if not running
         flaresolverr_settings = get_flaresolverr_settings()
         if flaresolverr_settings is not None:
             return flaresolverr_settings["userAgent"]
@@ -87,6 +88,12 @@ class PersistentSession(Session):
         self.save_cookies()
         return response
 
+    def _ensure_flaresolverr_initialized(self) -> None:
+        """Ensure FlareSolverr is ready when needed."""
+        if not self._flaresolverr_initialized:
+            ensure_flaresolverr_running()
+            self._flaresolverr_initialized = True
+
     def get(self, url: str | bytes, *, try_with_cloudflare: bool = False, _cloudflare_counter: int = 0, **kwargs: object) -> Response | None:
         if not try_with_cloudflare or "cf_clearance" in self.cookies:
             try:
@@ -107,10 +114,10 @@ class PersistentSession(Session):
                 else:
                     logger.warning("Cloudflare detected, but `try_with_cloudflare` wasn't set to True!")
 
+        self._ensure_flaresolverr_initialized()
+
         try:
             self._get_url_via_flaresolverr(url)
-            # After the url is retrieved from the flaresolverr proxy, it's not necessarily the one we want
-            #  --> So we'll re-request it here:
             return super().get(url, **kwargs)
         except Exception:
             logger.error("FlareSolverr didn't solve it :(")
@@ -129,8 +136,8 @@ class PersistentSession(Session):
         dta = response.json()
         for cookie in dta["solution"]["cookies"]:
             self.cookies.set(
-                name=cookie["name"],  # required
-                value=cookie["value"],  # required
+                name=cookie["name"],
+                value=cookie["value"],
                 version=cookie.get("version", 0),
                 port=cookie.get("port", None),
                 domain=cookie.get("domain", ""),
