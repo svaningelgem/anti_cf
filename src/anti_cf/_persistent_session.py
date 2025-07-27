@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pickle
 import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import fake_useragent
@@ -22,7 +23,6 @@ except ImportError:
     _HAS_CACHE = False
 
 if TYPE_CHECKING:
-    from pathlib import Path
 
     from requests import Response
 
