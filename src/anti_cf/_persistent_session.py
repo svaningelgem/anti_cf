@@ -80,7 +80,9 @@ class PersistentSession(Session):
 
     def save_cookies(self) -> None:
         """Save current cookies to file."""
-        self._COOKIES_FILE.write_bytes(pickle.dumps(self.cookies, protocol=4))
+        temp_file = Path(tempfile.mktemp(dir=self._COOKIES_FILE.parent))
+        temp_file.write_bytes(pickle.dumps(self.cookies, protocol=4))
+        temp_file.replace(self._COOKIES_FILE)
 
     def request(self, *args: object, **kwargs: object) -> Response:
         """Override request method to save cookies after each request."""
