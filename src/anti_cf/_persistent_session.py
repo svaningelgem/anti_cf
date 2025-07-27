@@ -23,7 +23,6 @@ except ImportError:
     _HAS_CACHE = False
 
 if TYPE_CHECKING:
-
     from requests import Response
 
 
