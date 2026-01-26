@@ -14,7 +14,7 @@ requests = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest-cov = "*"
-coverage = ">=7.13.1"
+coverage = ">=7.13.2"
 pytest-mock = "*"
 ruff = "*"
 
