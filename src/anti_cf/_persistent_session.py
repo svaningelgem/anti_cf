@@ -103,11 +103,11 @@ class PersistentSession(Session):
                 return resp
             except HTTPError as e:
                 if b"just a moment" not in e.response.content.lower():
-                    logger.error("No cloudflare trigger in response?")
+                    logger.warning("No cloudflare trigger in response?")
                     with tempfile.NamedTemporaryFile(delete=False) as f:
                         f.write(e.response.content)
-                        logger.error(f"No cloudflare trigger in response? [exception: {e}] [content: {f.name}]")
-                    logger.exception(e)
+                        logger.warning(f"No cloudflare trigger in response? [exception: {e}] [content: {f.name}]")
+                    # logger.exception(e)
                     return None
 
                 if try_with_cloudflare:
@@ -121,7 +121,7 @@ class PersistentSession(Session):
             self._get_url_via_flaresolverr(url)
             return super().get(url, **kwargs)
         except Exception:
-            logger.error("FlareSolverr didn't solve it :(")
+            logger.error(f"FlareSolverr didn't solve it :( [url: {url}]")
             raise
 
     def _get_url_via_flaresolverr(self, url: str) -> dict:

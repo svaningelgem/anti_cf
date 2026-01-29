@@ -209,6 +209,7 @@ def test_get_method_non_cloudflare_error(mocker: pytest_mock.MockerFixture, mock
     # Create error
     error_response = mocker.MagicMock()
     error_response.content = b"Access denied"
+
     error = HTTPError("403 Client Error")
     error.response = error_response
 
@@ -219,9 +220,9 @@ def test_get_method_non_cloudflare_error(mocker: pytest_mock.MockerFixture, mock
     # Test
     assert ps.get("https://example.com") is None
     mock_logger["info"].assert_not_called()
-    mock_logger["warning"].assert_not_called()
-    mock_logger["error"].assert_any_call("No cloudflare trigger in response?")
-    mock_logger["exception"].assert_any_call(error)
+    mock_logger["warning"].assert_any_call("No cloudflare trigger in response?")
+    mock_logger["error"].assert_not_called()
+    mock_logger["exception"].assert_not_called()
 
 
 def test_get_method_flaresolverr_exception(mocker: pytest_mock.MockerFixture, cloudflare_error: HTTPError) -> None:
