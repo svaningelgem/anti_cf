@@ -1,6 +1,7 @@
 import pickle
 from collections.abc import Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
@@ -8,6 +9,9 @@ import pytest_mock
 from requests import HTTPError
 
 from anti_cf._persistent_session import PersistentSession, session
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @pytest.fixture(autouse=True)
@@ -334,6 +338,191 @@ def test_sqlite_cache_uses_wal_and_busy_timeout(tmp_path: Path, mocker: pytest_m
         assert con.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
     finally:
         con.close()
+
+
+def _spy_on_connection_execute(ps: PersistentSession, mocker: pytest_mock.MockerFixture) -> list[str]:
+    """
+    Capture every ``execute(sql, …)`` issued on the cache's sqlite connection.
+
+    ``sqlite3.Connection.execute`` is read-only so we can't reassign it; instead
+    wrap the entire connection in a proxy that forwards every other attribute
+    via ``__getattr__`` and records SQL strings on the way through.
+    """
+    from contextlib import contextmanager
+
+    executed: list[str] = []
+    original_connection = ps.cache.responses.connection
+
+    class _Proxy:
+        def __init__(self, real: object) -> None:
+            self._real = real
+
+        def __getattr__(self, name: str) -> object:
+            return getattr(self._real, name)
+
+        def execute(self, sql: str, *args: object, **kwargs: object) -> object:
+            executed.append(sql)
+            return self._real.execute(sql, *args, **kwargs)
+
+    @contextmanager
+    def _wrap_connection(*args: object, **kwargs: object) -> "Iterator[_Proxy]":
+        with original_connection(*args, **kwargs) as real_con:
+            yield _Proxy(real_con)
+
+    mocker.patch.object(ps.cache.responses, "connection", _wrap_connection)
+    return executed
+
+
+class TestPurgeCache:
+    """Cover the on-demand and auto-purge cache cleanup paths."""
+
+    def _seed_responses(self, ps: PersistentSession, *, fresh: int = 1, expired: int = 1, old: int = 0) -> None:
+        """Pre-populate the cache with a mix of fresh / expired / old entries."""
+        import datetime
+
+        from requests_cache.models import CachedResponse
+
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        for i in range(fresh):
+            ps.cache.responses[f"fresh_{i}"] = CachedResponse(
+                status_code=200,
+                headers={},
+                content=b"f" * 1024,
+                url=f"http://example/fresh/{i}",
+                expires=now + datetime.timedelta(days=30),
+                created_at=now,
+            )
+        for i in range(expired):
+            ps.cache.responses[f"expired_{i}"] = CachedResponse(
+                status_code=200,
+                headers={},
+                content=b"e" * 1024,
+                url=f"http://example/expired/{i}",
+                expires=now - datetime.timedelta(seconds=60),
+                created_at=now,
+            )
+        # ``old`` entries are still fresh by TTL but their created_at is way back —
+        # the size-cap path drops them.
+        for i in range(old):
+            ps.cache.responses[f"old_{i}"] = CachedResponse(
+                status_code=200,
+                headers={},
+                content=b"o" * 1024,
+                url=f"http://example/old/{i}",
+                expires=now + datetime.timedelta(days=3650),
+                created_at=now - datetime.timedelta(days=365),
+            )
+
+    def test_drops_expired_entries(self, tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+        mocker.patch("anti_cf._persistent_session.CACHE_PATH", tmp_path)
+        # Block auto-purge during construction so the seed data isn't wiped before we test.
+        mocker.patch.object(PersistentSession, "_auto_purge_if_due", autospec=True)
+
+        ps = PersistentSession()
+        self._seed_responses(ps, fresh=2, expired=3)
+        stats = ps.purge_cache(vacuum=False)
+
+        assert stats["rows_before"] == 5
+        assert stats["rows_after"] == 2  # only the two fresh ones survive
+        assert sorted(ps.cache.responses.keys()) == ["fresh_0", "fresh_1"]
+
+    def test_older_than_evicts_age_capped_entries(self, tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+        """``older_than`` evicts long-TTL entries that would otherwise live forever."""
+        import datetime
+
+        mocker.patch("anti_cf._persistent_session.CACHE_PATH", tmp_path)
+        mocker.patch.object(PersistentSession, "_auto_purge_if_due", autospec=True)
+
+        ps = PersistentSession()
+        self._seed_responses(ps, fresh=1, expired=0, old=2)
+        stats = ps.purge_cache(older_than=datetime.timedelta(days=30), vacuum=False)
+
+        assert stats["rows_before"] == 3
+        assert stats["rows_after"] == 1  # only the one fresh-and-young entry survives
+        assert sorted(ps.cache.responses.keys()) == ["fresh_0"]
+
+    def test_vacuum_runs_when_requested(self, tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+        mocker.patch("anti_cf._persistent_session.CACHE_PATH", tmp_path)
+        mocker.patch.object(PersistentSession, "_auto_purge_if_due", autospec=True)
+
+        ps = PersistentSession()
+        self._seed_responses(ps, fresh=1, expired=2)
+
+        executed = _spy_on_connection_execute(ps, mocker)
+
+        ps.purge_cache(vacuum=True)
+        assert any(s.upper().strip() == "VACUUM" for s in executed)
+
+    def test_vacuum_skipped_when_not_requested(self, tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+        mocker.patch("anti_cf._persistent_session.CACHE_PATH", tmp_path)
+        mocker.patch.object(PersistentSession, "_auto_purge_if_due", autospec=True)
+
+        ps = PersistentSession()
+        self._seed_responses(ps, fresh=1, expired=1)
+        executed = _spy_on_connection_execute(ps, mocker)
+
+        ps.purge_cache(vacuum=False)
+        assert not any(s.upper().strip() == "VACUUM" for s in executed)
+
+    def test_marker_file_touched_after_purge(self, tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+        mocker.patch("anti_cf._persistent_session.CACHE_PATH", tmp_path)
+        mocker.patch.object(PersistentSession, "_auto_purge_if_due", autospec=True)
+
+        ps = PersistentSession()
+        marker = tmp_path / "url_cache.purged"
+        assert not marker.exists()
+        ps.purge_cache(vacuum=False)
+        assert marker.exists()
+
+    def test_purge_cache_raises_without_requests_cache(self, tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+        """When the optional dep is missing, the method explains itself instead of failing weirdly."""
+        mocker.patch("anti_cf._persistent_session.CACHE_PATH", tmp_path)
+        mocker.patch.object(PersistentSession, "_auto_purge_if_due", autospec=True)
+        ps = PersistentSession()
+        mocker.patch("anti_cf._persistent_session._HAS_CACHE", False)
+        with pytest.raises(RuntimeError, match="requests_cache"):
+            ps.purge_cache()
+
+
+class TestAutoPurge:
+    """Cover the construction-time auto-purge gate."""
+
+    def test_runs_purge_when_marker_missing(self, tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+        mocker.patch("anti_cf._persistent_session.CACHE_PATH", tmp_path)
+        purge = mocker.patch.object(PersistentSession, "purge_cache", autospec=True)
+        PersistentSession()
+        purge.assert_called_once()
+
+    def test_skips_purge_when_marker_recent(self, tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+        mocker.patch("anti_cf._persistent_session.CACHE_PATH", tmp_path)
+        marker = tmp_path / "url_cache.purged"
+        marker.touch()
+        purge = mocker.patch.object(PersistentSession, "purge_cache", autospec=True)
+        PersistentSession()
+        purge.assert_not_called()
+
+    def test_runs_purge_when_marker_older_than_interval(self, tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+        import os
+        import time
+
+        mocker.patch("anti_cf._persistent_session.CACHE_PATH", tmp_path)
+        marker = tmp_path / "url_cache.purged"
+        marker.touch()
+        # Backdate to before the interval window.
+        old = time.time() - PersistentSession._AUTO_PURGE_INTERVAL_SECONDS - 60
+        os.utime(marker, (old, old))
+
+        purge = mocker.patch.object(PersistentSession, "purge_cache", autospec=True)
+        PersistentSession()
+        purge.assert_called_once()
+
+    def test_swallows_purge_errors(self, tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+        """A failing housekeeping pass must not break the session constructor."""
+        mocker.patch("anti_cf._persistent_session.CACHE_PATH", tmp_path)
+        mocker.patch.object(PersistentSession, "purge_cache", side_effect=RuntimeError("boom"))
+        # Construction must succeed despite the purge raising.
+        ps = PersistentSession()
+        assert isinstance(ps, PersistentSession)
 
 
 def test_lazy_flaresolverr_branches(mocker: pytest_mock.MockerFixture) -> None:
