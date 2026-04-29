@@ -218,13 +218,8 @@ class PersistentSession(Session):
         self._purge_marker.touch()
 
         logger.info(
-            "Cache purge: rows %d->%d (-%d), size %d->%d bytes (-%d)",
-            rows_before,
-            rows_after,
-            rows_before - rows_after,
-            bytes_before,
-            bytes_after,
-            bytes_before - bytes_after,
+            f"Cache purge: rows {rows_before}->{rows_after} (-{rows_before - rows_after}), "
+            f"size {bytes_before}->{bytes_after} bytes (-{bytes_before - bytes_after})"
         )
         return {
             "rows_before": rows_before,
