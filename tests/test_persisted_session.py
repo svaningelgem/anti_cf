@@ -1,5 +1,6 @@
 import pickle
 from collections.abc import Mapping
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -257,6 +258,82 @@ def test_get_url_direct(mocker: pytest_mock.MockerFixture, cloudflare_response: 
     call_to_flaresolverr.assert_not_called()
 
     assert "cf_clearance" not in ps.cookies
+
+
+def test_cache_read_succeeds_under_concurrent_exclusive_writer(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+    """
+    Regression for ``sqlite3.OperationalError: database is locked``.
+
+    Why: multiple cron-fired scrapers share ``url_cache.sqlite`` from
+    different processes. Pre-fix the cache opened in default rollback-journal
+    mode -- a writer briefly holding EXCLUSIVE during COMMIT blocked every
+    reader, the default 5s busy_timeout expired, and ``__getitem__``'s
+    ``SELECT value FROM responses WHERE key=?`` raised OperationalError mid
+    request, crashing the scraper.
+
+    With WAL the reader uses the WAL file and never contends with the
+    writer's EXCLUSIVE on the main DB. This test reproduces the contention
+    via two independent sqlite3 connections in-process (sqlite enforces
+    locks at the file level, not per-process) and asserts the cached
+    response is returned despite the held EXCLUSIVE.
+    """
+    pytest.importorskip("requests_cache")
+    import sqlite3
+
+    from requests_cache.models import CachedResponse
+
+    cache_dir = tmp_path / "anti_cf"
+    cache_dir.mkdir()
+    mocker.patch("anti_cf._persistent_session.CACHE_PATH", cache_dir)
+
+    ps = PersistentSession()
+
+    # Seed one cached response that the production read path can find.
+    seeded = CachedResponse(status_code=200, headers={}, content=b"hello", url="http://example.invalid/")
+    ps.cache.responses["seed"] = seeded
+
+    db_path = cache_dir / "url_cache.sqlite"
+
+    # Hold an EXCLUSIVE on a separate connection — the lock that, without WAL,
+    # blocks every other reader for up to busy_timeout.
+    blocker = sqlite3.connect(db_path, timeout=0.1)
+    try:
+        blocker.execute("BEGIN EXCLUSIVE")
+
+        # Production read path: a low connection-level timeout (0.3s) means
+        # *if* WAL were off, the read would raise within a third of a second;
+        # we keep the test fast and deterministic that way.
+        with ps.cache.responses.connection() as con:
+            con.execute("PRAGMA busy_timeout=300")
+            row = con.execute("SELECT value FROM responses WHERE key='seed'").fetchone()
+        assert row is not None, "WAL should let the reader proceed despite the held EXCLUSIVE"
+    finally:
+        blocker.close()
+
+
+def test_sqlite_cache_uses_wal_and_busy_timeout(tmp_path: Path, mocker: pytest_mock.MockerFixture) -> None:
+    """Pragma-level smoke check for the ``wal`` + ``busy_timeout`` kwargs."""
+    pytest.importorskip("requests_cache")
+    import sqlite3
+
+    cache_dir = tmp_path / "anti_cf"
+    cache_dir.mkdir()
+    mocker.patch("anti_cf._persistent_session.CACHE_PATH", cache_dir)
+
+    ps = PersistentSession()
+
+    # Pragmas applied at the SQLiteDict level — verify on its own connection.
+    with ps.cache.responses.connection() as con:
+        assert con.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+        assert con.execute("PRAGMA busy_timeout").fetchone()[0] == 10_000
+
+    # And the WAL mode persists at the file level — re-open from outside.
+    db_path = cache_dir / "url_cache.sqlite"
+    con = sqlite3.connect(db_path)
+    try:
+        assert con.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+    finally:
+        con.close()
 
 
 def test_lazy_flaresolverr_branches(mocker: pytest_mock.MockerFixture) -> None:
