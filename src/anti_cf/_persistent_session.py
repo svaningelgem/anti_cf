@@ -32,11 +32,19 @@ class PersistentSession(Session):
 
     def __init__(self) -> None:
         if _HAS_CACHE:
+            # WAL + busy_timeout so concurrent scrapers sharing this cache don't
+            # raise sqlite3.OperationalError("database is locked"). Without WAL,
+            # any writer blocks every other reader/writer; with the default
+            # 5s busy_timeout, simultaneous cron-fired scrapers race and one
+            # loses. WAL lets readers and one writer proceed in parallel, and
+            # 10s gives writers enough headroom for the contended startup.
             super().__init__(
                 CACHE_PATH / "url_cache.sqlite",
                 backend="sqlite",
                 cache_control=False,
                 expire_after=2 * 3600,
+                wal=True,
+                busy_timeout=10_000,
                 headers={
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                     "Accept-Language": "en-US,en;q=0.5",
