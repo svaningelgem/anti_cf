@@ -382,7 +382,7 @@ class TestPurgeCache:
 
         from requests_cache.models import CachedResponse
 
-        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        now = datetime.datetime.now(tz=datetime.UTC)
         for i in range(fresh):
             ps.cache.responses[f"fresh_{i}"] = CachedResponse(
                 status_code=200,
