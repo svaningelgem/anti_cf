@@ -1,0 +1,18 @@
+name: Python
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python:
+    uses: svaningelgem/ci-workflows/.github/workflows/python.yml@v1
+    with:
+      pytest-args: --cov=anti_cf --cov-report=xml
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
