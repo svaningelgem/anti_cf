@@ -4,7 +4,7 @@ import contextlib
 import pickle
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
@@ -201,7 +201,7 @@ class PersistentSession(Session):
 
         # Step 2: optional age cap — drop anything older than ``older_than`` by created_at.
         if older_than is not None:
-            cutoff = datetime.now(timezone.utc) - older_than
+            cutoff = datetime.now(UTC) - older_than
             stale_keys = [key for key, resp in self.cache.responses.items() if getattr(resp, "created_at", None) is not None and resp.created_at < cutoff]
             if stale_keys:
                 self.cache.delete(*stale_keys, vacuum=False)
