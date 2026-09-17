@@ -135,6 +135,7 @@ strict = true
 "tests/**/*.py" = ["D100", "D103", "B018", "FBT001"]
 
 [tool.coverage.run]
+source = ["anti_cf"]
 branch = true
 
 [tool.coverage.report]
