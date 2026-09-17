@@ -22,7 +22,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest-cov",
-    "requests-cache",
     "coverage>=7.13.2",
     "pytest-mock",
     "ruff",
