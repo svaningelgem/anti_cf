@@ -1,5 +1,6 @@
 import pickle
 from collections.abc import Mapping
+from importlib.util import find_spec
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
@@ -9,6 +10,8 @@ import pytest_mock
 from requests import HTTPError
 
 from anti_cf._persistent_session import PersistentSession, session
+
+requires_cache = pytest.mark.skipif(find_spec("requests_cache") is None, reason="requests_cache is an optional extra")
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -373,6 +376,7 @@ def _spy_on_connection_execute(ps: PersistentSession, mocker: pytest_mock.Mocker
     return executed
 
 
+@requires_cache
 class TestPurgeCache:
     """Cover the on-demand and auto-purge cache cleanup paths."""
 
@@ -484,6 +488,7 @@ class TestPurgeCache:
             ps.purge_cache()
 
 
+@requires_cache
 class TestAutoPurge:
     """Cover the construction-time auto-purge gate."""
 
